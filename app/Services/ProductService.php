@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\Product;
-use App\Models\ProductImage;
 use App\Models\User;
 use App\Repositories\ProductRepository;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -56,7 +55,7 @@ class ProductService
             $this->syncRelations($product, $variants, $specifications, $warranty);
             $this->storeImages($product, $images);
 
-            return $product->fresh(['images', 'variants', 'specifications', 'warranty']);
+            return $product->fresh(['images', 'variants', 'specifications', 'warranty', 'category', 'brandModel', 'subCategoryModel']);
         });
     }
 
@@ -101,7 +100,7 @@ class ProductService
                 $this->storeImages($product, $images);
             }
 
-            return $product->fresh(['images', 'variants', 'specifications', 'warranty']);
+            return $product->fresh(['images', 'variants', 'specifications', 'warranty', 'category', 'brandModel', 'subCategoryModel']);
         });
     }
 
@@ -111,35 +110,12 @@ class ProductService
         $this->products->delete($product);
     }
 
-    public function addImages(User $user, int $productId, array $images): Product
-    {
-        return DB::transaction(function () use ($user, $productId, $images): Product {
-            $product = $this->products->findForTenant($this->tenantId($user), $productId);
-            $this->storeImages($product, $images);
-
-            return $product->fresh(['images', 'variants', 'specifications', 'warranty']);
-        });
-    }
-
-    public function deleteImage(User $user, int $productId, int $imageId): Product
-    {
-        return DB::transaction(function () use ($user, $productId, $imageId): Product {
-            $product = $this->products->findForTenant($this->tenantId($user), $productId);
-            $image = $this->products->findImageForProduct($product, $imageId);
-
-            Storage::disk('public')->delete($image->image_path);
-            $image->delete();
-
-            return $product->fresh(['images', 'variants', 'specifications', 'warranty']);
-        });
-    }
-
     public function updateStatus(User $user, int $productId, string $status): Product
     {
         $product = $this->products->findForTenant($this->tenantId($user), $productId);
         $this->products->update($product, ['status' => $status]);
 
-        return $product->fresh(['images', 'variants', 'specifications', 'warranty']);
+        return $product->fresh(['images', 'variants', 'specifications', 'warranty', 'category', 'brandModel', 'subCategoryModel']);
     }
 
     private function tenantId(User $user): int
@@ -242,7 +218,7 @@ class ProductService
             })
             ->all();
 
-        $this->products->addImages($product, $records);
+        $product->images()->createMany($records);
     }
 
     private function uniqueSlug(int $tenantId, ?string $slug, string $name, ?int $ignoreProductId = null): string

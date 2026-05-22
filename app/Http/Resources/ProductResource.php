@@ -16,13 +16,13 @@ class ProductResource extends JsonResource
         return [
             'id' => $this->id,
             'tenant_id' => $this->tenant_id,
+            'category_id' => $this->category_id,
+            'brand_id' => $this->brand_id,
+            'sub_category_id' => $this->sub_category_id,
             'name' => $this->name,
             'slug' => $this->slug,
-            'sub_category' => $this->sub_category,
             'model_number' => $this->model_number,
             'condition' => $this->condition,
-            'brand' => $this->brand,
-            'category_id' => $this->category_id,
             'description' => $this->description,
             'tags' => $this->tags ?? [],
             'selling_price' => $this->selling_price,
@@ -40,6 +40,25 @@ class ProductResource extends JsonResource
             'shipping_class' => $this->shipping_class,
             'free_shipping' => $this->free_shipping,
             'status' => $this->status,
+            'category' => $this->whenLoaded('category', fn (): ?array => $this->category ? [
+                'id' => $this->category->id,
+                'name' => $this->category->name,
+                'slug' => $this->category->slug,
+                'status' => $this->category->status,
+            ] : null),
+            'brand' => $this->whenLoaded('brandModel', fn (): ?array => $this->brandModel ? [
+                'id' => $this->brandModel->id,
+                'name' => $this->brandModel->name,
+                'slug' => $this->brandModel->slug,
+                'status' => $this->brandModel->status,
+            ] : null),
+            'sub_category' => $this->whenLoaded('subCategoryModel', fn (): ?array => $this->subCategoryModel ? [
+                'id' => $this->subCategoryModel->id,
+                'category_id' => $this->subCategoryModel->category_id,
+                'name' => $this->subCategoryModel->name,
+                'slug' => $this->subCategoryModel->slug,
+                'status' => $this->subCategoryModel->status,
+            ] : null),
             'images' => $this->whenLoaded('images', fn () => $this->images
                 ->sortBy('sort_order')
                 ->values()

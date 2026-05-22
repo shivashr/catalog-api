@@ -1,0 +1,235 @@
+{
+  "info": {
+    "name": "Taxonomy + Product Flow",
+    "_postman_id": "d3f4b6d6-8fd7-4a0a-9e2a-3d8b9b0f2c11",
+    "description": "Backend-only taxonomy and product API flow for the Laravel app. No login endpoint exists in the codebase; generate a token with `php artisan product:token owner@example.com local-product-api` and paste it into the `token` variable.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth - Current User",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": "{{base_url}}/user"
+      }
+    },
+    {
+      "name": "Category - List",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": "{{base_url}}/categories"
+      }
+    },
+    {
+      "name": "Category - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Mobile & Tablets\",\n  \"slug\": \"mobile-tablets\",\n  \"status\": \"active\"\n}"
+        },
+        "url": "{{base_url}}/categories"
+      }
+    },
+    {
+      "name": "Category - Sync Brands",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"brand_ids\": [{{brand_id}}]\n}"
+        },
+        "url": "{{base_url}}/categories/{{category_id}}/brands"
+      }
+    },
+    {
+      "name": "Brand - List",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": "{{base_url}}/brands"
+      }
+    },
+    {
+      "name": "Brand - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Samsung\",\n  \"slug\": \"samsung\",\n  \"status\": \"active\"\n}"
+        },
+        "url": "{{base_url}}/brands"
+      }
+    },
+    {
+      "name": "Sub-category - List",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": "{{base_url}}/sub-categories"
+      }
+    },
+    {
+      "name": "Sub-category - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"category_id\": {{category_id}},\n  \"name\": \"Smartphones\",\n  \"slug\": \"smartphones\",\n  \"status\": \"active\"\n}"
+        },
+        "url": "{{base_url}}/sub-categories"
+      }
+    },
+    {
+      "name": "Options - Active Categories",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": "{{base_url}}/options/categories/active"
+      }
+    },
+    {
+      "name": "Options - Active Brands by Category",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": "{{base_url}}/options/categories/{{category_id}}/brands/active"
+      }
+    },
+    {
+      "name": "Options - Active Sub-categories by Category",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": "{{base_url}}/options/categories/{{category_id}}/sub-categories/active"
+      }
+    },
+    {
+      "name": "Product - Create Draft",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"category_id\": {{category_id}},\n  \"brand_id\": {{brand_id}},\n  \"sub_category_id\": {{sub_category_id}},\n  \"status\": \"draft\"\n}"
+        },
+        "url": "{{base_url}}/products"
+      }
+    },
+    {
+      "name": "Product - Create Active With Image",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "category_id", "value": "{{category_id}}", "type": "text" },
+            { "key": "brand_id", "value": "{{brand_id}}", "type": "text" },
+            { "key": "sub_category_id", "value": "{{sub_category_id}}", "type": "text" },
+            { "key": "name", "value": "Galaxy S24", "type": "text" },
+            { "key": "condition", "value": "new", "type": "text" },
+            { "key": "description", "value": "Flagship smartphone", "type": "text" },
+            { "key": "selling_price", "value": "999.99", "type": "text" },
+            { "key": "stock_quantity", "value": "10", "type": "text" },
+            { "key": "sku", "value": "GS24-001", "type": "text" },
+            { "key": "status", "value": "active", "type": "text" },
+            { "key": "images", "type": "file", "src": "" }
+          ]
+        },
+        "url": "{{base_url}}/products"
+      }
+    },
+    {
+      "name": "Product - Invalid Brand Relation",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"category_id\": {{category_id}},\n  \"brand_id\": {{nike_brand_id}},\n  \"sub_category_id\": {{sub_category_id}},\n  \"name\": \"Invalid Nike Product\",\n  \"condition\": \"new\",\n  \"description\": \"Should fail brand relation\",\n  \"selling_price\": 99.99,\n  \"stock_quantity\": 1,\n  \"sku\": \"BAD-NIKE-001\",\n  \"status\": \"draft\"\n}"
+        },
+        "url": "{{base_url}}/products"
+      }
+    },
+    {
+      "name": "Product - Invalid Sub-category Relation",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"category_id\": {{category_id}},\n  \"brand_id\": {{brand_id}},\n  \"sub_category_id\": {{shoes_sub_category_id}},\n  \"name\": \"Invalid Shoes Product\",\n  \"condition\": \"new\",\n  \"description\": \"Should fail sub-category relation\",\n  \"selling_price\": 99.99,\n  \"stock_quantity\": 1,\n  \"sku\": \"BAD-SHOES-001\",\n  \"status\": \"draft\"\n}"
+        },
+        "url": "{{base_url}}/products"
+      }
+    }
+  ],
+  "variable": [
+    { "key": "base_url", "value": "http://127.0.0.1:8000/api/v1" },
+    { "key": "token", "value": "" },
+    { "key": "category_id", "value": "2" },
+    { "key": "brand_id", "value": "1" },
+    { "key": "sub_category_id", "value": "1" },
+    { "key": "fashion_category_id", "value": "3" },
+    { "key": "nike_brand_id", "value": "4" },
+    { "key": "shoes_sub_category_id", "value": "4" }
+  ]
+}

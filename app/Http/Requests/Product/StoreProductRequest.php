@@ -3,8 +3,9 @@
 namespace App\Http\Requests\Product;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
+use Illuminate\Support\Facades\DB;
 
 class StoreProductRequest extends FormRequest
 {
@@ -23,10 +24,10 @@ class StoreProductRequest extends FormRequest
 
         return [
             'category_id' => [$requiredWhenActive, 'nullable', 'integer', Rule::exists('categories', 'id')->where('tenant_id', $tenantId)],
+            'brand_id' => [$requiredWhenActive, 'nullable', 'integer', Rule::exists('brands', 'id')->where('tenant_id', $tenantId)],
+            'sub_category_id' => [$requiredWhenActive, 'nullable', 'integer', Rule::exists('sub_categories', 'id')->where('tenant_id', $tenantId)],
             'name' => [$requiredWhenActive, 'nullable', 'string', 'max:255'],
             'slug' => ['nullable', 'string', 'max:255'],
-            'brand' => ['nullable', 'string', 'max:255'],
-            'sub_category' => ['nullable', 'string', 'max:255'],
             'model_number' => ['nullable', 'string', 'max:255'],
             'condition' => [$requiredWhenActive, 'nullable', Rule::in(['new', 'used', 'refurbished'])],
             'description' => [$requiredWhenActive, 'nullable', 'string'],
@@ -123,6 +124,41 @@ class StoreProductRequest extends FormRequest
                 if ($this->input('status') === 'active' && count($this->file('images', [])) < 1) {
                     $validator->errors()->add('images', 'At least one product image is required to publish an active product.');
                 }
+
+                $tenantId = $this->user()?->tenant_id;
+                $categoryId = $this->input('category_id');
+                $brandId = $this->input('brand_id');
+                $subCategoryId = $this->input('sub_category_id');
+
+                if (($brandId !== null || $subCategoryId !== null) && blank($categoryId)) {
+                    $validator->errors()->add('category_id', 'A category is required when selecting brand or sub-category.');
+
+                    return;
+                }
+
+                if ($tenantId !== null && $categoryId !== null && $brandId !== null) {
+                    $brandLinkedToCategory = DB::table('category_brand')
+                        ->where('tenant_id', $tenantId)
+                        ->where('category_id', (int) $categoryId)
+                        ->where('brand_id', (int) $brandId)
+                        ->exists();
+
+                    if (! $brandLinkedToCategory) {
+                        $validator->errors()->add('brand_id', 'The selected brand is not linked to the selected category.');
+                    }
+                }
+
+                if ($tenantId !== null && $categoryId !== null && $subCategoryId !== null) {
+                    $subCategoryMatchesCategory = DB::table('sub_categories')
+                        ->where('tenant_id', $tenantId)
+                        ->where('id', (int) $subCategoryId)
+                        ->where('category_id', (int) $categoryId)
+                        ->exists();
+
+                    if (! $subCategoryMatchesCategory) {
+                        $validator->errors()->add('sub_category_id', 'The selected sub-category does not belong to the selected category.');
+                    }
+                }
             },
         ];
     }
@@ -134,6 +170,8 @@ class StoreProductRequest extends FormRequest
     {
         return [
             'category_id.required' => 'A category is required to publish an active product.',
+            'brand_id.required' => 'A brand is required to publish an active product.',
+            'sub_category_id.required' => 'A sub-category is required to publish an active product.',
             'name.required' => 'A product name is required to publish an active product.',
             'condition.required' => 'A condition is required to publish an active product.',
             'description.required' => 'A description is required to publish an active product.',

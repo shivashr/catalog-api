@@ -21,10 +21,10 @@ class Product extends Model
     protected $fillable = [
         'tenant_id',
         'category_id',
+        'brand_id',
+        'sub_category_id',
         'name',
         'slug',
-        'brand',
-        'sub_category',
         'model_number',
         'condition',
         'description',
@@ -74,6 +74,22 @@ class Product extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
+    }
+
+    /**
+     * Relation name intentionally avoids conflict with legacy "brand" column.
+     */
+    public function brandModel(): BelongsTo
+    {
+        return $this->belongsTo(Brand::class, 'brand_id');
+    }
+
+    /**
+     * Relation name intentionally avoids conflict with legacy "sub_category" column.
+     */
+    public function subCategoryModel(): BelongsTo
+    {
+        return $this->belongsTo(SubCategory::class, 'sub_category_id');
     }
 
     public function images(): HasMany

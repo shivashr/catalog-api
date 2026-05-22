@@ -4,9 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Tenant extends Model
+class Brand extends Model
 {
     use HasFactory;
 
@@ -16,30 +18,22 @@ class Tenant extends Model
      * @var list<string>
      */
     protected $fillable = [
+        'tenant_id',
         'name',
         'slug',
-        'domain',
         'status',
     ];
 
-    public function users(): HasMany
+    public function tenant(): BelongsTo
     {
-        return $this->hasMany(User::class);
+        return $this->belongsTo(Tenant::class);
     }
 
-    public function categories(): HasMany
+    public function categories(): BelongsToMany
     {
-        return $this->hasMany(Category::class);
-    }
-
-    public function brands(): HasMany
-    {
-        return $this->hasMany(Brand::class);
-    }
-
-    public function subCategories(): HasMany
-    {
-        return $this->hasMany(SubCategory::class);
+        return $this->belongsToMany(Category::class, 'category_brand')
+            ->withPivot('tenant_id')
+            ->withTimestamps();
     }
 
     public function products(): HasMany

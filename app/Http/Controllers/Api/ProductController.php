@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Product\StoreProductImagesRequest;
 use App\Http\Requests\Product\StoreProductRequest;
 use App\Http\Requests\Product\UpdateProductRequest;
 use App\Http\Requests\Product\UpdateProductStatusRequest;
@@ -71,24 +70,6 @@ class ProductController extends Controller
         $this->products->delete($user, $product->id);
 
         return response()->json(null, 204);
-    }
-
-    public function storeImages(StoreProductImagesRequest $request, Product $product): ProductResource
-    {
-        $user = $this->authenticatedUser($request);
-        $this->authorize('update', $product);
-
-        return new ProductResource(
-            $this->products->addImages($user, $product->id, $request->validated('images'))
-        );
-    }
-
-    public function destroyImage(Request $request, Product $product, int $image): ProductResource
-    {
-        $user = $this->authenticatedUser($request);
-        $this->authorize('update', $product);
-
-        return new ProductResource($this->products->deleteImage($user, $product->id, $image));
     }
 
     public function updateStatus(UpdateProductStatusRequest $request, Product $product): ProductResource

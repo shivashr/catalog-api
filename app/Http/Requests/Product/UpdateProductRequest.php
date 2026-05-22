@@ -4,8 +4,9 @@ namespace App\Http\Requests\Product;
 
 use App\Models\Product;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
+use Illuminate\Support\Facades\DB;
 
 class UpdateProductRequest extends FormRequest
 {
@@ -25,10 +26,10 @@ class UpdateProductRequest extends FormRequest
 
         return [
             'category_id' => ['sometimes', 'nullable', 'integer', Rule::exists('categories', 'id')->where('tenant_id', $tenantId)],
+            'brand_id' => ['sometimes', 'nullable', 'integer', Rule::exists('brands', 'id')->where('tenant_id', $tenantId)],
+            'sub_category_id' => ['sometimes', 'nullable', 'integer', Rule::exists('sub_categories', 'id')->where('tenant_id', $tenantId)],
             'name' => ['sometimes', 'nullable', 'string', 'max:255'],
             'slug' => ['sometimes', 'nullable', 'string', 'max:255'],
-            'brand' => ['sometimes', 'nullable', 'string', 'max:255'],
-            'sub_category' => ['sometimes', 'nullable', 'string', 'max:255'],
             'model_number' => ['sometimes', 'nullable', 'string', 'max:255'],
             'condition' => ['sometimes', 'nullable', Rule::in(['new', 'used', 'refurbished'])],
             'description' => ['sometimes', 'nullable', 'string'],
@@ -136,6 +137,41 @@ class UpdateProductRequest extends FormRequest
 
                 $targetStatus = $this->input('status', $product->status);
 
+                $tenantId = $this->user()?->tenant_id;
+                $categoryId = $this->has('category_id') ? $this->input('category_id') : $product->category_id;
+                $brandId = $this->has('brand_id') ? $this->input('brand_id') : $product->brand_id;
+                $subCategoryId = $this->has('sub_category_id') ? $this->input('sub_category_id') : $product->sub_category_id;
+
+                if (($brandId !== null || $subCategoryId !== null) && blank($categoryId)) {
+                    $validator->errors()->add('category_id', 'A category is required when selecting brand or sub-category.');
+
+                    return;
+                }
+
+                if ($tenantId !== null && $categoryId !== null && $brandId !== null) {
+                    $brandLinkedToCategory = DB::table('category_brand')
+                        ->where('tenant_id', $tenantId)
+                        ->where('category_id', (int) $categoryId)
+                        ->where('brand_id', (int) $brandId)
+                        ->exists();
+
+                    if (! $brandLinkedToCategory) {
+                        $validator->errors()->add('brand_id', 'The selected brand is not linked to the selected category.');
+                    }
+                }
+
+                if ($tenantId !== null && $categoryId !== null && $subCategoryId !== null) {
+                    $subCategoryMatchesCategory = DB::table('sub_categories')
+                        ->where('tenant_id', $tenantId)
+                        ->where('id', (int) $subCategoryId)
+                        ->where('category_id', (int) $categoryId)
+                        ->exists();
+
+                    if (! $subCategoryMatchesCategory) {
+                        $validator->errors()->add('sub_category_id', 'The selected sub-category does not belong to the selected category.');
+                    }
+                }
+
                 if ($targetStatus !== 'active') {
                     return;
                 }
@@ -150,6 +186,8 @@ class UpdateProductRequest extends FormRequest
                 $requiredFields = [
                     'name' => 'A product name is required to publish an active product.',
                     'category_id' => 'A category is required to publish an active product.',
+                    'brand_id' => 'A brand is required to publish an active product.',
+                    'sub_category_id' => 'A sub-category is required to publish an active product.',
                     'condition' => 'A condition is required to publish an active product.',
                     'description' => 'A description is required to publish an active product.',
                     'selling_price' => 'A selling price is required to publish an active product.',
@@ -175,6 +213,8 @@ class UpdateProductRequest extends FormRequest
     {
         return [
             'category_id.required' => 'A category is required to publish an active product.',
+            'brand_id.required' => 'A brand is required to publish an active product.',
+            'sub_category_id.required' => 'A sub-category is required to publish an active product.',
             'name.required' => 'A product name is required to publish an active product.',
             'condition.required' => 'A condition is required to publish an active product.',
             'description.required' => 'A description is required to publish an active product.',

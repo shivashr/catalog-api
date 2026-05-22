@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Models\Brand;
+use App\Models\Category;
 use App\Models\Product;
+use App\Models\SubCategory;
 use App\Models\Tenant;
 use App\Models\User;
-use App\Models\Category;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -26,12 +28,7 @@ class ProductAuthorizationTest extends TestCase
             'status' => 'active',
         ]);
 
-        $category = Category::query()->create([
-            'tenant_id' => $tenant->id,
-            'name' => 'Shoes',
-            'slug' => 'shoes',
-            'status' => 'active',
-        ]);
+        ['category' => $category, 'brand' => $brand, 'subCategory' => $subCategory] = $this->createTaxonomy($tenant, 'shoes');
 
         $owner = User::factory()->create([
             'tenant_id' => $tenant->id,
@@ -41,7 +38,7 @@ class ProductAuthorizationTest extends TestCase
 
         Sanctum::actingAs($owner);
 
-        $response = $this->post('/api/v1/products', $this->activePayload($category->id, 'TRAIL-001'), [
+        $response = $this->post('/api/v1/products', $this->activePayload($category->id, $brand->id, $subCategory->id, 'TRAIL-001'), [
             'Accept' => 'application/json',
         ]);
 
@@ -63,12 +60,7 @@ class ProductAuthorizationTest extends TestCase
             'status' => 'active',
         ]);
 
-        $category = Category::query()->create([
-            'tenant_id' => $tenant->id,
-            'name' => 'Shoes',
-            'slug' => 'beta-shoes',
-            'status' => 'active',
-        ]);
+        ['category' => $category, 'brand' => $brand, 'subCategory' => $subCategory] = $this->createTaxonomy($tenant, 'beta-shoes');
 
         $customer = User::factory()->create([
             'tenant_id' => $tenant->id,
@@ -78,7 +70,7 @@ class ProductAuthorizationTest extends TestCase
 
         Sanctum::actingAs($customer);
 
-        $response = $this->post('/api/v1/products', $this->activePayload($category->id, 'TRAIL-001'), [
+        $response = $this->post('/api/v1/products', $this->activePayload($category->id, $brand->id, $subCategory->id, 'TRAIL-001'), [
             'Accept' => 'application/json',
         ]);
 
@@ -96,12 +88,7 @@ class ProductAuthorizationTest extends TestCase
             'status' => 'active',
         ]);
 
-        $categoryA = Category::query()->create([
-            'tenant_id' => $tenantA->id,
-            'name' => 'Shoes',
-            'slug' => 'gamma-shoes',
-            'status' => 'active',
-        ]);
+        ['category' => $categoryA, 'brand' => $brandA, 'subCategory' => $subCategoryA] = $this->createTaxonomy($tenantA, 'gamma-shoes');
 
         $tenantB = Tenant::query()->create([
             'name' => 'Delta Store',
@@ -117,7 +104,7 @@ class ProductAuthorizationTest extends TestCase
 
         Sanctum::actingAs($owner);
 
-        $payload = $this->activePayload($categoryA->id, 'TRAIL-002');
+        $payload = $this->activePayload($categoryA->id, $brandA->id, $subCategoryA->id, 'TRAIL-002');
         $payload['tenant_id'] = $tenantB->id;
 
         $response = $this->post('/api/v1/products', $payload, [
@@ -210,7 +197,7 @@ class ProductAuthorizationTest extends TestCase
             ->assertJsonPath('data.tenant_id', $tenant->id);
     }
 
-    public function test_active_product_without_category_or_image_fails_validation(): void
+    public function test_active_product_without_category_or_images_fails_validation(): void
     {
         $tenant = Tenant::query()->create([
             'name' => 'Validation Store',
@@ -237,7 +224,7 @@ class ProductAuthorizationTest extends TestCase
         ]);
 
         $response->assertUnprocessable()
-            ->assertJsonValidationErrors(['category_id', 'images']);
+            ->assertJsonValidationErrors(['category_id', 'brand_id', 'sub_category_id', 'images']);
     }
 
     public function test_active_product_with_category_and_image_succeeds(): void
@@ -250,10 +237,41 @@ class ProductAuthorizationTest extends TestCase
             'status' => 'active',
         ]);
 
-        $category = Category::query()->create([
+        ['category' => $category, 'brand' => $brand, 'subCategory' => $subCategory] = $this->createTaxonomy($tenant, 'publish-electronics');
+
+        $owner = User::factory()->create([
             'tenant_id' => $tenant->id,
-            'name' => 'Electronics',
-            'slug' => 'publish-electronics',
+            'role' => 'owner',
+            'status' => 'active',
+        ]);
+
+        Sanctum::actingAs($owner);
+
+        $response = $this->post('/api/v1/products', $this->activePayload($category->id, $brand->id, $subCategory->id, 'ACTIVE-IMAGE-001'), [
+            'Accept' => 'application/json',
+        ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('data.status', 'active')
+            ->assertJsonPath('data.category_id', $category->id)
+            ->assertJsonPath('data.images.0.is_primary', true);
+    }
+
+    public function test_active_product_fails_when_brand_is_not_linked_to_category(): void
+    {
+        Storage::fake('public');
+
+        $tenant = Tenant::query()->create([
+            'name' => 'Brand Link Store',
+            'slug' => 'brand-link-store',
+            'status' => 'active',
+        ]);
+
+        ['category' => $category, 'subCategory' => $subCategory] = $this->createTaxonomy($tenant, 'brand-link');
+        $unlinkedBrand = Brand::query()->create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Unlinked Brand',
+            'slug' => 'unlinked-brand',
             'status' => 'active',
         ]);
 
@@ -265,14 +283,65 @@ class ProductAuthorizationTest extends TestCase
 
         Sanctum::actingAs($owner);
 
-        $response = $this->post('/api/v1/products', $this->activePayload($category->id, 'ACTIVE-IMAGE-001'), [
-            'Accept' => 'application/json',
+        $response = $this->postJson('/api/v1/products', [
+            'category_id' => $category->id,
+            'brand_id' => $unlinkedBrand->id,
+            'sub_category_id' => $subCategory->id,
+            'name' => 'Broken Taxonomy Product',
+            'condition' => 'new',
+            'description' => 'Invalid brand link.',
+            'selling_price' => 99.99,
+            'stock_quantity' => 2,
+            'sku' => 'BROKEN-LINK-001',
+            'status' => 'active',
+            'images' => [
+                UploadedFile::fake()->image('product.jpg')->size(500),
+            ],
         ]);
 
-        $response->assertCreated()
-            ->assertJsonPath('data.status', 'active')
-            ->assertJsonPath('data.category_id', $category->id)
-            ->assertJsonPath('data.images.0.is_primary', true);
+        $response->assertUnprocessable()
+            ->assertJsonValidationErrors(['brand_id']);
+    }
+
+    public function test_active_product_fails_when_sub_category_does_not_belong_to_category(): void
+    {
+        Storage::fake('public');
+
+        $tenant = Tenant::query()->create([
+            'name' => 'Subcategory Rule Store',
+            'slug' => 'subcategory-rule-store',
+            'status' => 'active',
+        ]);
+
+        ['category' => $category, 'brand' => $brand] = $this->createTaxonomy($tenant, 'sub-rule-one');
+        ['subCategory' => $otherSubCategory] = $this->createTaxonomy($tenant, 'sub-rule-two');
+
+        $owner = User::factory()->create([
+            'tenant_id' => $tenant->id,
+            'role' => 'owner',
+            'status' => 'active',
+        ]);
+
+        Sanctum::actingAs($owner);
+
+        $response = $this->postJson('/api/v1/products', [
+            'category_id' => $category->id,
+            'brand_id' => $brand->id,
+            'sub_category_id' => $otherSubCategory->id,
+            'name' => 'Wrong Subcategory Product',
+            'condition' => 'new',
+            'description' => 'Sub-category/category mismatch.',
+            'selling_price' => 149.99,
+            'stock_quantity' => 3,
+            'sku' => 'BROKEN-SUB-001',
+            'status' => 'active',
+            'images' => [
+                UploadedFile::fake()->image('product.jpg')->size(500),
+            ],
+        ]);
+
+        $response->assertUnprocessable()
+            ->assertJsonValidationErrors(['sub_category_id']);
     }
 
     public function test_status_update_to_active_requires_existing_image(): void
@@ -283,12 +352,7 @@ class ProductAuthorizationTest extends TestCase
             'status' => 'active',
         ]);
 
-        $category = Category::query()->create([
-            'tenant_id' => $tenant->id,
-            'name' => 'Electronics',
-            'slug' => 'status-electronics',
-            'status' => 'active',
-        ]);
+        ['category' => $category, 'brand' => $brand, 'subCategory' => $subCategory] = $this->createTaxonomy($tenant, 'status-electronics');
 
         $owner = User::factory()->create([
             'tenant_id' => $tenant->id,
@@ -299,6 +363,8 @@ class ProductAuthorizationTest extends TestCase
         $product = Product::query()->create([
             'tenant_id' => $tenant->id,
             'category_id' => $category->id,
+            'brand_id' => $brand->id,
+            'sub_category_id' => $subCategory->id,
             'name' => 'Draft Without Image',
             'slug' => 'draft-without-image',
             'condition' => 'new',
@@ -328,12 +394,7 @@ class ProductAuthorizationTest extends TestCase
             'status' => 'active',
         ]);
 
-        $category = Category::query()->create([
-            'tenant_id' => $tenant->id,
-            'name' => 'Electronics',
-            'slug' => 'electronics',
-            'status' => 'active',
-        ]);
+        ['category' => $category, 'brand' => $brand, 'subCategory' => $subCategory] = $this->createTaxonomy($tenant, 'electronics');
 
         $owner = User::factory()->create([
             'tenant_id' => $tenant->id,
@@ -345,10 +406,10 @@ class ProductAuthorizationTest extends TestCase
 
         $response = $this->post('/api/v1/products', [
             'category_id' => $category->id,
+            'brand_id' => $brand->id,
+            'sub_category_id' => $subCategory->id,
             'name' => 'Noise Cancelling Headphones',
             'slug' => 'noise-cancelling-headphones',
-            'brand' => 'Tukaatu',
-            'sub_category' => 'Headphones',
             'model_number' => 'NC-500',
             'condition' => 'new',
             'description' => 'Over-ear wireless ANC headphones.',
@@ -397,8 +458,12 @@ class ProductAuthorizationTest extends TestCase
 
         $response->assertCreated()
             ->assertJsonPath('data.category_id', $category->id)
+            ->assertJsonPath('data.brand_id', $brand->id)
+            ->assertJsonPath('data.sub_category_id', $subCategory->id)
+            ->assertJsonPath('data.category.id', $category->id)
+            ->assertJsonPath('data.brand.id', $brand->id)
+            ->assertJsonPath('data.sub_category.id', $subCategory->id)
             ->assertJsonPath('data.tax_rate', '13.00')
-            ->assertJsonPath('data.sub_category', 'Headphones')
             ->assertJsonPath('data.model_number', 'NC-500')
             ->assertJsonPath('data.free_shipping', true)
             ->assertJsonPath('data.variants.color.0', 'Black')
@@ -422,12 +487,7 @@ class ProductAuthorizationTest extends TestCase
             'status' => 'active',
         ]);
 
-        $category = Category::query()->create([
-            'tenant_id' => $tenant->id,
-            'name' => 'Electronics',
-            'slug' => 'crud-electronics',
-            'status' => 'active',
-        ]);
+        ['category' => $category, 'brand' => $brand, 'subCategory' => $subCategory] = $this->createTaxonomy($tenant, 'crud-electronics');
 
         $owner = User::factory()->create([
             'tenant_id' => $tenant->id,
@@ -439,6 +499,8 @@ class ProductAuthorizationTest extends TestCase
 
         $createResponse = $this->post('/api/v1/products', [
             'category_id' => $category->id,
+            'brand_id' => $brand->id,
+            'sub_category_id' => $subCategory->id,
             'name' => 'Full CRUD Product',
             'description' => 'Verifies create, read, update, status, image upload, image delete, and product delete.',
             'condition' => 'new',
@@ -457,7 +519,6 @@ class ProductAuthorizationTest extends TestCase
             ->assertJsonPath('data.images.0.is_primary', true);
 
         $productId = $createResponse->json('data.id');
-        $firstImageId = $createResponse->json('data.images.0.id');
         $firstImagePath = $createResponse->json('data.images.0.image_path');
 
         Storage::disk('public')->assertExists($firstImagePath);
@@ -466,22 +527,10 @@ class ProductAuthorizationTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.name', 'Full CRUD Product');
 
-        $this->patchJson("/api/v1/products/{$productId}", [
+        $updateResponse = $this->put("/api/v1/products/{$productId}", [
             'name' => 'Updated CRUD Product',
             'sku' => 'FULL-CRUD-002',
             'selling_price' => 249.99,
-        ])
-            ->assertOk()
-            ->assertJsonPath('data.name', 'Updated CRUD Product')
-            ->assertJsonPath('data.sku', 'FULL-CRUD-002');
-
-        $this->patchJson("/api/v1/products/{$productId}/status", [
-            'status' => 'draft',
-        ])
-            ->assertOk()
-            ->assertJsonPath('data.status', 'draft');
-
-        $imageResponse = $this->post("/api/v1/products/{$productId}/images", [
             'images' => [
                 UploadedFile::fake()->image('gallery.png')->size(500),
             ],
@@ -489,14 +538,16 @@ class ProductAuthorizationTest extends TestCase
             'Accept' => 'application/json',
         ]);
 
-        $imageResponse->assertOk();
-        $this->assertCount(2, $imageResponse->json('data.images'));
+        $updateResponse->assertOk()
+            ->assertJsonPath('data.name', 'Updated CRUD Product')
+            ->assertJsonPath('data.sku', 'FULL-CRUD-002');
+        $this->assertCount(2, $updateResponse->json('data.images'));
 
-        $this->deleteJson("/api/v1/products/{$productId}/images/{$firstImageId}")
-            ->assertOk();
-
-        Storage::disk('public')->assertMissing($firstImagePath);
-        $this->assertDatabaseMissing('product_images', ['id' => $firstImageId]);
+        $this->patchJson("/api/v1/products/{$productId}/status", [
+            'status' => 'draft',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'draft');
 
         $this->deleteJson("/api/v1/products/{$productId}")
             ->assertNoContent();
@@ -507,10 +558,12 @@ class ProductAuthorizationTest extends TestCase
     /**
      * @return array<string, mixed>
      */
-    private function activePayload(int $categoryId, string $sku): array
+    private function activePayload(int $categoryId, int $brandId, int $subCategoryId, string $sku): array
     {
         return [
             'category_id' => $categoryId,
+            'brand_id' => $brandId,
+            'sub_category_id' => $subCategoryId,
             'name' => 'Trail Running Shoe',
             'condition' => 'new',
             'description' => 'Balanced cushion and grip for mixed surfaces.',
@@ -521,6 +574,44 @@ class ProductAuthorizationTest extends TestCase
             'images' => [
                 UploadedFile::fake()->image('product.jpg')->size(500),
             ],
+        ];
+    }
+
+    /**
+     * @return array{category: Category, brand: Brand, subCategory: SubCategory}
+     */
+    private function createTaxonomy(Tenant $tenant, string $slugPrefix): array
+    {
+        $category = Category::query()->create([
+            'tenant_id' => $tenant->id,
+            'name' => ucfirst(str_replace('-', ' ', $slugPrefix)).' Category',
+            'slug' => $slugPrefix.'-category',
+            'status' => 'active',
+        ]);
+
+        $brand = Brand::query()->create([
+            'tenant_id' => $tenant->id,
+            'name' => ucfirst(str_replace('-', ' ', $slugPrefix)).' Brand',
+            'slug' => $slugPrefix.'-brand',
+            'status' => 'active',
+        ]);
+
+        $subCategory = SubCategory::query()->create([
+            'tenant_id' => $tenant->id,
+            'category_id' => $category->id,
+            'name' => ucfirst(str_replace('-', ' ', $slugPrefix)).' SubCategory',
+            'slug' => $slugPrefix.'-sub-category',
+            'status' => 'active',
+        ]);
+
+        $category->brands()->sync([
+            $brand->id => ['tenant_id' => $tenant->id],
+        ]);
+
+        return [
+            'category' => $category,
+            'brand' => $brand,
+            'subCategory' => $subCategory,
         ];
     }
 }

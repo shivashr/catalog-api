@@ -3,16 +3,14 @@
 namespace App\Repositories;
 
 use App\Models\Product;
-use App\Models\ProductImage;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Database\Eloquent\Collection;
 
 class ProductRepository
 {
     public function paginateForTenant(int $tenantId, int $perPage = 15): LengthAwarePaginator
     {
         return Product::query()
-            ->with(['images', 'variants', 'specifications', 'warranty'])
+            ->with(['images', 'variants', 'specifications', 'warranty', 'category', 'brandModel', 'subCategoryModel'])
             ->where('tenant_id', $tenantId)
             ->latest()
             ->paginate($perPage);
@@ -21,7 +19,7 @@ class ProductRepository
     public function findForTenant(int $tenantId, int $productId): Product
     {
         return Product::query()
-            ->with(['images', 'variants', 'specifications', 'warranty'])
+            ->with(['images', 'variants', 'specifications', 'warranty', 'category', 'brandModel', 'subCategoryModel'])
             ->where('tenant_id', $tenantId)
             ->findOrFail($productId);
     }
@@ -75,16 +73,6 @@ class ProductRepository
         }
 
         $product->warranty()->updateOrCreate([], $warranty);
-    }
-
-    public function addImages(Product $product, array $images): Collection
-    {
-        return $product->images()->createMany($images);
-    }
-
-    public function findImageForProduct(Product $product, int $imageId): ProductImage
-    {
-        return $product->images()->findOrFail($imageId);
     }
 
     public function delete(Product $product): void
