@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\ProductCouponController;
 use App\Http\Controllers\Api\BrandController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\SubCategoryController;
@@ -15,6 +16,9 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function (): void {
 
     Route::apiResource('products', ProductController::class);
     Route::patch('products/{product}/status', [ProductController::class, 'updateStatus']);
+    Route::apiResource('product-coupons', ProductCouponController::class);
+    Route::post('product-coupons/{productCoupon}/redeem', [ProductCouponController::class, 'redeem']);
+    Route::post('product-coupons/check-return-eligibility', [ProductCouponController::class, 'checkReturnEligibility']);
 
     Route::apiResource('categories', CategoryController::class);
     Route::put('categories/{category}/brands', [CategoryController::class, 'syncBrands']);

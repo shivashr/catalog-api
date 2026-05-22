@@ -111,4 +111,9 @@ class Product extends Model
     {
         return $this->hasOne(ProductWarranty::class);
     }
+
+    public function coupons(): HasMany
+    {
+        return $this->hasMany(ProductCoupon::class);
+    }
 }
